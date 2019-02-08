@@ -1,0 +1,7 @@
+*.pyc
+*.suo
+*.solverstate
+*.caffemodel
+__pycache__/
+.ipynb_checkpoints/
+ovotools.egg-info/
