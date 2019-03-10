@@ -114,7 +114,7 @@ class LogTrainingResults:
             str = "Epoch:{}.{}\t".format(engine.state.epoch, engine.state.iteration)
         else:
             str = "Epoch:{}\t".format(engine.state.epoch)
-        str += '\t'.join(['{}:{:.3f}'.format(k,v) for k,v in engine.state.metrics.items()])
+        str += '\t'.join(['{}:{:.5f}'.format(k,v) for k,v in engine.state.metrics.items()])
         print(str)
         with open(self.params.get_base_filename() + '.log', 'a') as f:
             f.write(str + '\n')
