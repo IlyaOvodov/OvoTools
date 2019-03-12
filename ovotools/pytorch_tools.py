@@ -56,6 +56,10 @@ class MarginBaseLoss:
             loss = 0
             n = len(pred_embeddings) # samples in batch
             dim =  pred_embeddings[0].shape[0] # dimensionality
+            self.true_pos = 0
+            self.true_neg = 0
+            self.false_pos = 0
+            self.false_neg = 0
 
             with self.timer.watch('time.d_ij'):
                 assert len(pred_embeddings.shape) == 2, pred_embeddings.shape
@@ -74,18 +78,44 @@ class MarginBaseLoss:
                     weights_same = weights[i_start: i_end] # i-th element already excluded
                     j = np.random.choice(range(i_start, i_end), p = weights_same/np.sum(weights_same), replace=False)
                     assert j != i
-                    loss += (self.params.mb_loss.alpha + (self.d_ij[i,j] - self.model.mb_loss_beta)).clamp(min=0)  #https://arxiv.org/pdf/1706.07567.pdf
+                    loss += (self.model.mb_loss_alpha + (self.d_ij[i,j] - self.model.mb_loss_beta)).clamp(min=0)  #https://arxiv.org/pdf/1706.07567.pdf
                     # select neg. pait
                     weights = np.delete(weights, np.s_[i_start: i_end], axis=0)
                     k = np.random.choice(range(0, n - self.params.data.samples_per_class), p = weights/np.sum(weights), replace=False)
                     if k >= i_start:
                         k += self.params.data.samples_per_class
-                    loss += (self.params.mb_loss.alpha - (self.d_ij[i,k] - self.model.mb_loss_beta)).clamp(min=0)  #https://arxiv.org/pdf/1706.07567.pdf
+                    loss += (self.model.mb_loss_alpha - (self.d_ij[i,k] - self.model.mb_loss_beta)).clamp(min=0)  #https://arxiv.org/pdf/1706.07567.pdf
                     self.mb_loss_val = loss[0] / len(pred_embeddings)
+                    negative = (d > self.model.mb_loss_beta.detach()).float()
+                    positive = (d <= self.model.mb_loss_beta.detach()).float()
+                    fn = sum(negative[i_start: i_end])
+                    self.false_neg += fn
+                    tp = sum(positive[i_start: i_end])
+                    self.true_pos += tp
+                    fp = sum(positive[: i_start]) + sum(positive[i_end:])
+                    self.false_pos += fp
+                    fn = sum(negative[: i_start]) + sum(negative[i_end:])
+                    self.true_neg += fn
+            self.true_pos /= n
+            self.true_neg /= n
+            self.false_pos /= n
+            self.false_neg /= n
             return self.mb_loss_val
 
     def last_mb_loss(self, net_output, y_class):
         return self.mb_loss_val
+
+    def last_false_pos(self, net_output, y_class):
+        return self.false_pos
+
+    def last_false_neg(self, net_output, y_class):
+        return self.false_neg
+
+    def last_true_pos(self, net_output, y_class):
+        return self.true_pos
+
+    def last_true_neg(self, net_output, y_class):
+        return self.true_neg
 
     def loss(self, net_output, y_class):
         self.loss_val = self.l2_loss(net_output, y_class) + self.mb_loss(net_output, y_class)
