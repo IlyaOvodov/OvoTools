@@ -60,7 +60,7 @@ class MarginBaseLoss:
             with self.timer.watch('time.d_ij'):
                 assert len(pred_embeddings.shape) == 2, pred_embeddings.shape
                 norm = (pred_embeddings ** 2).sum(1)
-                self.d_ij = norm.view(-1, 1) + norm.view(1, -1) - 2.0 * torch.mm(pred_embeddings, torch.transpose(pred_embeddings, 0, 1))
+                self.d_ij = norm.view(-1, 1) + norm.view(1, -1) - 2.0 * torch.mm(pred_embeddings, torch.transpose(pred_embeddings, 0, 1)) #https://discuss.pytorch.org/t/efficient-distance-matrix-computation/9065/8
                 self.d_ij = torch.sqrt(torch.clamp(self.d_ij, min=0.0) + 1.0e-8)
 
             for i_start in range(0, n, self.params.data.samples_per_class): # start of class block
@@ -72,12 +72,12 @@ class MarginBaseLoss:
                     weights[i] = 0 # dont join with itself
                     # select positive pair
                     weights_same = weights[i_start: i_end] # i-th element already excluded
-                    j = np.random.choice(range(i_start, i_end), p = weights_same/np.sum(weights_same) )
+                    j = np.random.choice(range(i_start, i_end), p = weights_same/np.sum(weights_same), replace=False)
                     assert j != i
                     loss += (self.params.mb_loss.alpha + (self.d_ij[i,j] - self.model.mb_loss_beta)).clamp(min=0)  #https://arxiv.org/pdf/1706.07567.pdf
                     # select neg. pait
                     weights = np.delete(weights, np.s_[i_start: i_end], axis=0)
-                    k = np.random.choice(range(0, n - self.params.data.samples_per_class), p = weights/np.sum(weights))
+                    k = np.random.choice(range(0, n - self.params.data.samples_per_class), p = weights/np.sum(weights), replace=False)
                     if k >= i_start:
                         k += self.params.data.samples_per_class
                     loss += (self.params.mb_loss.alpha - (self.d_ij[i,k] - self.model.mb_loss_beta)).clamp(min=0)  #https://arxiv.org/pdf/1706.07567.pdf

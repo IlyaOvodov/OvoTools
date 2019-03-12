@@ -103,13 +103,12 @@ class LogTrainingResults:
         self.params = params
 
     def __call__(self, engine, event):
-        if event == Events.ITERATION_COMPLETED and engine.state.epoch != 1:
-            return
         for key,loader in self.loaders_dict.items():
             self.evaluator.run(loader)
             for k,v in self.evaluator.state.metrics.items():
                 engine.state.metrics[key+':'+k] = v
-        self.best_model_buffer.save_if_best(engine)
+        if self.best_model_buffer:
+            self.best_model_buffer.save_if_best(engine)
         if event == Events.ITERATION_COMPLETED:
             str = "Epoch:{}.{}\t".format(engine.state.epoch, engine.state.iteration)
         else:
@@ -158,3 +157,6 @@ class TensorBoardLogger:
                     self.writer.add_scalar(n, v, self.call_count)
             else:
                 self.writer.add_scalars(n, d, self.call_count)
+        for path, writer in self.writer.all_writers.items():
+            writer.flush()
+
