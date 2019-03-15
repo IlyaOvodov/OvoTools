@@ -61,6 +61,8 @@ class MarginBaseLoss:
             self.false_pos = 0
             self.false_neg = 0
 
+            alpha = self.model.mb_loss_alpha if self.params.mb_loss.train_alpha else self.model.mb_loss_alpha.detach()
+
             with self.timer.watch('time.d_ij'):
                 assert len(pred_embeddings.shape) == 2, pred_embeddings.shape
                 norm = (pred_embeddings ** 2).sum(1)
@@ -78,13 +80,13 @@ class MarginBaseLoss:
                     weights_same = weights[i_start: i_end] # i-th element already excluded
                     j = np.random.choice(range(i_start, i_end), p = weights_same/np.sum(weights_same), replace=False)
                     assert j != i
-                    loss += (self.model.mb_loss_alpha + (self.d_ij[i,j] - self.model.mb_loss_beta)).clamp(min=0)  #https://arxiv.org/pdf/1706.07567.pdf
-                    # select neg. pait
+                    loss += (alpha + (self.d_ij[i,j] - self.model.mb_loss_beta)).clamp(min=0) - alpha #https://arxiv.org/pdf/1706.07567.pdf
+                    # select neg. pair
                     weights = np.delete(weights, np.s_[i_start: i_end], axis=0)
                     k = np.random.choice(range(0, n - self.params.data.samples_per_class), p = weights/np.sum(weights), replace=False)
                     if k >= i_start:
                         k += self.params.data.samples_per_class
-                    loss += (self.model.mb_loss_alpha - (self.d_ij[i,k] - self.model.mb_loss_beta)).clamp(min=0)  #https://arxiv.org/pdf/1706.07567.pdf
+                    loss += ((alpha - (self.d_ij[i,k] - self.model.mb_loss_beta)).clamp(min=0) - alpha)*self.params.mb_loss.neg2pos_weight  #https://arxiv.org/pdf/1706.07567.pdf
                     self.mb_loss_val = loss[0] / len(pred_embeddings)
                     negative = (d > self.model.mb_loss_beta.detach()).float()
                     positive = (d <= self.model.mb_loss_beta.detach()).float()

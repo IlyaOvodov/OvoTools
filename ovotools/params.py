@@ -98,7 +98,7 @@ class AttrDict(dict):
             params.data_root = data_root
         return AttrDict(params)
         
-    def load(params_fn, data_root, verbose = False):
+    def load(params_fn, data_root = None, verbose = False):
         '''
         loads from file, adding '.param.txt' to name
         '''
