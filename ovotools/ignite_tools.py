@@ -1,5 +1,7 @@
 import copy
+import math
 import torch
+import ignite
 from ignite.engine import Events
 import collections
 import time
@@ -77,7 +79,7 @@ class BestModelBuffer:
         self.best_score = None
         self.best_epoch = None
 
-    def save_if_best(self, engine):
+    def __call__(self, engine):
         assert self.metric_name in engine.state.metrics.keys(), "{} {}".format(self.metric_name, engine.state.metrics.keys())
         if self.best_score is None or self.best_score > engine.state.metrics[self.metric_name]:
             self.best_score = engine.state.metrics[self.metric_name]
@@ -85,7 +87,10 @@ class BestModelBuffer:
             self.best_epoch = engine.state.epoch
             print('model for {}={} dumped'.format(self.metric_name, self.best_score))
             if self.save_to_file:
-                torch.save(self.best_dict, self.params.get_base_filename() + '.t7')
+                self.save_model()
+
+    def save_model(self, suffix = ""):
+        torch.save(self.best_dict, self.params.get_base_filename() + suffix + '.t7')
 
     def restore(self, model = None):
         assert self.best_dict is not None
@@ -108,7 +113,7 @@ class LogTrainingResults:
             for k,v in self.evaluator.state.metrics.items():
                 engine.state.metrics[key+':'+k] = v
         if self.best_model_buffer:
-            self.best_model_buffer.save_if_best(engine)
+            self.best_model_buffer(engine)
         if event == Events.ITERATION_COMPLETED:
             str = "Epoch:{}.{}\t".format(engine.state.epoch, engine.state.iteration)
         else:
@@ -160,3 +165,88 @@ class TensorBoardLogger:
         for path, writer in self.writer.all_writers.items():
             writer.flush()
 
+
+class ClrScheduler:
+    def __init__(self, train_loader, model, optimizer, metric_name, params, minimize = True, engine = None):
+        self.optimizer = optimizer
+        self.params = params
+        self.cycle_index = 0
+        self.iter_index = 0
+        self.iterations_per_epoch = len(train_loader)
+        self.min_lr = params.clr.min_lr
+        self.max_lr = params.clr.max_lr
+        self.best_model_buffer = BestModelBuffer(model, metric_name, params, minimize = minimize, save_to_file = False)
+        if engine:
+            self.attach(engine)
+
+    def attach(self, engine):
+        engine.add_event_handler(Events.EPOCH_STARTED, self.upd_lr_epoch)
+        engine.add_event_handler(Events.ITERATION_STARTED, self.upd_lr)
+        engine.add_event_handler(Events.EPOCH_COMPLETED, self.best_model_buffer)
+
+    def upd_lr_epoch(self, engine):
+        if (self.cycle_index == 0 and self.iter_index == self.params.clr.warmup_epochs*self.iterations_per_epoch
+                                        or self.cycle_index > 0 and self.iter_index == self.params.clr.period_epochs*self.iterations_per_epoch):
+            if self.cycle_index > 0:
+                self.best_model_buffer.save_model('.'+str(self.cycle_index))
+                self.best_model_buffer.restore()
+                self.best_model_buffer.reset()
+                self.min_lr *= self.params.clr.scale_min_lr
+                self.max_lr *= self.params.clr.scale_max_lr
+            self.cycle_index += 1
+            self.iter_index = 0
+
+    def upd_lr(self, engine):
+        if self.cycle_index == 0:
+            lr = self.min_lr + (self.max_lr - self.min_lr) * self.iter_index/(self.params.clr.warmup_epochs*self.iterations_per_epoch)
+        else:
+            cycle_progress = self.iter_index / (self.params.clr.period_epochs*self.iterations_per_epoch)
+            lr = self.max_lr + ((self.min_lr - self.max_lr) / 2) * (1 - math.cos(math.pi * cycle_progress))
+        self.optimizer.param_groups[0]['lr'] = lr
+        engine.state.metrics['lr'] = self.optimizer.param_groups[0]['lr']
+        self.iter_index += 1
+
+
+
+
+def create_supervised_trainer(model, optimizer, loss_fn, metrics={},
+                              device=None, non_blocking=False,
+                              prepare_batch=ignite.engine._prepare_batch):
+    """
+    Factory function for creating a trainer for supervised models.
+
+    Args:
+        model (`torch.nn.Module`): the model to train.
+        optimizer (`torch.optim.Optimizer`): the optimizer to use.
+        loss_fn (torch.nn loss function): the loss function to use.
+        device (str, optional): device type specification (default: None).
+            Applies to both model and batches.
+        non_blocking (bool, optional): if True and this copy is between CPU and GPU, the copy may occur asynchronously
+            with respect to the host. For other cases, this argument has no effect.
+        prepare_batch (callable, optional): function that receives `batch`, `device`, `non_blocking` and outputs
+            tuple of tensors `(batch_x, batch_y)`.
+
+    Note: `engine.state.output` for this engine is the loss of the processed batch.
+
+    Returns:
+        Engine: a trainer engine with supervised update function.
+    """
+    if device:
+        model.to(device)
+
+    def _update(engine, batch):
+        model.train()
+        optimizer.zero_grad()
+        x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
+        y_pred = model(x)
+        loss = loss_fn(y_pred, y)
+        loss.backward()
+        optimizer.step()
+        return y_pred, y
+
+    engine = ignite.engine.Engine(_update)
+
+    for name, metric in metrics.items():
+        metric.attach(engine, name)
+
+    return engine

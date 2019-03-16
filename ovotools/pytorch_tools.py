@@ -62,12 +62,12 @@ class MarginBaseLoss:
             self.false_neg = 0
 
             alpha = self.model.mb_loss_alpha if self.params.mb_loss.train_alpha else self.model.mb_loss_alpha.detach()
+            alpha2 = self.model.mb_loss_alpha if self.params.mb_loss.train_alpha else 0
 
-            with self.timer.watch('time.d_ij'):
-                assert len(pred_embeddings.shape) == 2, pred_embeddings.shape
-                norm = (pred_embeddings ** 2).sum(1)
-                self.d_ij = norm.view(-1, 1) + norm.view(1, -1) - 2.0 * torch.mm(pred_embeddings, torch.transpose(pred_embeddings, 0, 1)) #https://discuss.pytorch.org/t/efficient-distance-matrix-computation/9065/8
-                self.d_ij = torch.sqrt(torch.clamp(self.d_ij, min=0.0) + 1.0e-8)
+            assert len(pred_embeddings.shape) == 2, pred_embeddings.shape
+            norm = (pred_embeddings ** 2).sum(1)
+            self.d_ij = norm.view(-1, 1) + norm.view(1, -1) - 2.0 * torch.mm(pred_embeddings, torch.transpose(pred_embeddings, 0, 1)) #https://discuss.pytorch.org/t/efficient-distance-matrix-computation/9065/8
+            self.d_ij = torch.sqrt(torch.clamp(self.d_ij, min=0.0) + 1.0e-8)
 
             for i_start in range(0, n, self.params.data.samples_per_class): # start of class block
                 i_end = i_start + self.params.data.samples_per_class # start of class block
@@ -80,24 +80,32 @@ class MarginBaseLoss:
                     weights_same = weights[i_start: i_end] # i-th element already excluded
                     j = np.random.choice(range(i_start, i_end), p = weights_same/np.sum(weights_same), replace=False)
                     assert j != i
-                    loss += (alpha + (self.d_ij[i,j] - self.model.mb_loss_beta)).clamp(min=0) - alpha #https://arxiv.org/pdf/1706.07567.pdf
+                    loss += (alpha + (self.d_ij[i,j] - self.model.mb_loss_beta)).clamp(min=0) - alpha2 #https://arxiv.org/pdf/1706.07567.pdf
                     # select neg. pair
                     weights = np.delete(weights, np.s_[i_start: i_end], axis=0)
-                    k = np.random.choice(range(0, n - self.params.data.samples_per_class), p = weights/np.sum(weights), replace=False)
+                    with self.timer.watch('time.mb_loss_k'):
+                        k = np.random.choice(range(0, n - self.params.data.samples_per_class), p = weights/np.sum(weights), replace=False)
                     if k >= i_start:
                         k += self.params.data.samples_per_class
-                    loss += ((alpha - (self.d_ij[i,k] - self.model.mb_loss_beta)).clamp(min=0) - alpha)*self.params.mb_loss.neg2pos_weight  #https://arxiv.org/pdf/1706.07567.pdf
+                    loss += ((alpha - (self.d_ij[i,k] - self.model.mb_loss_beta)).clamp(min=0) - alpha2)*self.params.mb_loss.neg2pos_weight  #https://arxiv.org/pdf/1706.07567.pdf
                     self.mb_loss_val = loss[0] / len(pred_embeddings)
-                    negative = (d > self.model.mb_loss_beta.detach()).float()
-                    positive = (d <= self.model.mb_loss_beta.detach()).float()
-                    fn = sum(negative[i_start: i_end])
-                    self.false_neg += fn
-                    tp = sum(positive[i_start: i_end])
-                    self.true_pos += tp
-                    fp = sum(positive[: i_start]) + sum(positive[i_end:])
-                    self.false_pos += fp
-                    fn = sum(negative[: i_start]) + sum(negative[i_end:])
-                    self.true_neg += fn
+                    with self.timer.watch('time.mb_loss_acc1'):
+                        '''
+                        negative = (d > self.model.mb_loss_beta.detach()).float()
+                        positive = (d <= self.model.mb_loss_beta.detach()).float()
+                        '''
+                        negative = (d > self.model.mb_loss_beta.detach())
+                        positive = (~negative).float()
+                        negative = negative.float()
+                    with self.timer.watch('time.mb_loss_acc2'):
+                        fn = (negative[i_start: i_end]).sum()
+                        self.false_neg += fn
+                        tp = (positive[i_start: i_end]).sum()
+                        self.true_pos += tp
+                        fp = (positive[: i_start]).sum() + (positive[i_end:]).sum()
+                        self.false_pos += fp
+                        fn = (negative[: i_start]).sum() + (negative[i_end:]).sum()
+                        self.true_neg += fn
             self.true_pos /= n
             self.true_neg /= n
             self.false_pos /= n
