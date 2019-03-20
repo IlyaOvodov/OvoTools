@@ -71,7 +71,7 @@ class AttrDict(dict):
         assert self.has('data_root')
         return os.path.join(self.data_root, self.get_model_name())
 
-    def save(self, base_fn = None, verbose = False, can_overwrite = False):
+    def save(self, base_fn = None, verbose = 1, can_overwrite = False):
         '''
         save to file adding '.param.txt' to name
         '''
@@ -84,8 +84,10 @@ class AttrDict(dict):
             s = repr(self)
             s = s + '\nhash: ' + self.hash()
             f.write(s)
-            if verbose:
-                print('params: '+ s + '\nsaved to ' + params_fn)
+            if verbose >= 2:
+                print('params: '+ s)
+            if verbose >= 1:
+                print('saved to ' + params_fn)
                 
     def load_from_str(s, data_root):
         s = ''.join(s)
@@ -98,7 +100,7 @@ class AttrDict(dict):
             params.data_root = data_root
         return AttrDict(params)
         
-    def load(params_fn, data_root = None, verbose = False):
+    def load(params_fn, data_root = None, verbose = 1):
         '''
         loads from file, adding '.param.txt' to name
         '''
@@ -107,8 +109,10 @@ class AttrDict(dict):
             s = f.readlines()
             assert s[-1].startswith('hash:')
             params = AttrDict.load_from_str(s[:-1], data_root)
-        if verbose:
-            print('params: '+ repr(params) + '\nhash: ' + params.hash() + '\nloaded from ' + params_fn)
+        if verbose >= 2:
+            print('params: '+ repr(params) + '\nhash: ' + params.hash())
+        if verbose >= 1:
+            print('loaded from ' + params_fn)
         return params
 
         
