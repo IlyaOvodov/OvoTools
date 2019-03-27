@@ -17,6 +17,19 @@ class DummyTimer:
     def watch(self, name): return self.TimerWatch(self, name)
 
 
+class DataSubset:
+    '''
+    subset of base_dataset defined by indexes
+    '''
+    def __init__(self, base_dataset, indexes):
+        self.base_dataset = base_dataset
+        self.indexes = indexes
+    def __len__(self):
+        return len(self.indexes)
+    def __getitem__(self, item):
+        return self.base_dataset[self.indexes[item]]
+
+
 class MarginBaseLoss:
     '''
     L2-constrained Softmax Loss for Discriminative Face Verification https://arxiv.org/pdf/1703.09507
