@@ -66,13 +66,12 @@ class IgniteTimes:
 
 
 class BestModelBuffer:
-    def __init__(self, model, metric_name, params, minimize = True, save_to_file = True, save_to_dir_suffix = None, verbose = 1):
+    def __init__(self, model, metric_name, params, minimize = True, save_to_file = True, verbose = 1):
         self.model = model
         assert metric_name
         self.metric_name = metric_name
         assert minimize == True, "Not implemented"
         self.save_to_file = save_to_file
-        self.save_to_dir_suffix = save_to_dir_suffix
         self.verbose = verbose
         self.params = params
         self.reset()
@@ -93,13 +92,12 @@ class BestModelBuffer:
             if self.save_to_file:
                 self.save_model()
 
-    def save_model(self, file_suffix = "model"):
-        if self.save_to_dir_suffix is not None:
-            dir_name = self.params.get_base_filename() + self.save_to_dir_suffix
-            os.makedirs(dir_name, exist_ok=True)
-            file_name = os.path.join(dir_name, file_suffix + '.t7')
-        else:
-            file_name = self.params.get_base_filename() + file_suffix + '.t7'
+    def save_model(self, rel_dir = "models", filename = None):
+        if filename is None:
+            filename = self.params.get_model_name() + ".t7"
+        file_name = os.path.join(self.params.get_base_filename(), rel_dir, filename)
+        dir_name = os.path.dirname(file_name)
+        os.makedirs(dir_name, exist_ok=True)
         torch.save(self.best_dict, file_name)
 
     def restore(self, model = None):
@@ -112,11 +110,14 @@ class BestModelBuffer:
 
 
 class LogTrainingResults:
-    def __init__(self, evaluator, loaders_dict, best_model_buffer, params):
+    def __init__(self, evaluator, loaders_dict, best_model_buffer, params, rel_dir = "", filename = None):
         self.evaluator = evaluator
         self.loaders_dict = loaders_dict
         self.best_model_buffer = best_model_buffer
         self.params = params
+        if filename is None:
+            filename = self.params.get_model_name() + ".log"
+        self.file_name = os.path.join(self.params.get_base_filename(), rel_dir, filename)
 
     def __call__(self, engine, event):
         for key,loader in self.loaders_dict.items():
@@ -131,7 +132,10 @@ class LogTrainingResults:
             str = "Epoch:{}\t".format(engine.state.epoch)
         str += '\t'.join(['{}:{:.5f}'.format(k,v) for k,v in engine.state.metrics.items()])
         print(str)
-        with open(self.params.get_base_filename() + '.log', 'a') as f:
+
+        dir_name = os.path.dirname(self.file_name)
+        os.makedirs(dir_name, exist_ok=True)
+        with open(self.file_name, 'a') as f:
             f.write(str + '\n')
 
 
@@ -139,14 +143,19 @@ class TensorBoardLogger:
     SERIES_PLOT_SEPARATOR = ':'
     GROUP_PLOT_SEPARATOR = '.'
 
-    def __init__(self, trainer_engine, params, count_iters=False, period=1):
-        log_dir = params.get_base_filename()
-        self.writer = tensorboardX.SummaryWriter(log_dir=log_dir, flush_secs = 10)
+    def __init__(self, trainer_engine, params, count_iters=False, period=1, rel_dir = "tb_log"):
+        self.log_dir = os.path.join(params.get_base_filename(), rel_dir)
+        self.writer = tensorboardX.SummaryWriter(log_dir=self.log_dir, flush_secs = 10)
         event = Events.ITERATION_COMPLETED if count_iters else Events.EPOCH_COMPLETED
         trainer_engine.add_event_handler(event, self.on_event)
         self.period = period
         self.call_count = 0
         trainer_engine.add_event_handler(Events.COMPLETED, self.on_completed)
+
+    def start_server(self, port):
+        cmd = r"tensorboard --host 127.0.0.1 --port {port} --logdir {dir}".format(port=port, dir=self.log_dir)
+        print(cmd)
+        os.popen(cmd)
 
     def on_completed(self, engine):
         self.writer.close()
@@ -186,8 +195,8 @@ class ClrScheduler:
         self.iterations_per_epoch = len(train_loader)
         self.min_lr = params.clr.min_lr
         self.max_lr = params.clr.max_lr
-        self.best_model_buffer = BestModelBuffer(model, metric_name, params, minimize = minimize, save_to_file = False,
-                                                 save_to_dir_suffix = '.clr_models', verbose = 0)
+        self.best_model_buffer = BestModelBuffer(model, metric_name, params, minimize = minimize,
+                                                 save_to_file = False, verbose = 0)
         if engine:
             self.attach(engine)
 
@@ -200,7 +209,7 @@ class ClrScheduler:
         if (self.cycle_index == 0 and self.iter_index == self.params.clr.warmup_epochs*self.iterations_per_epoch
                                         or self.cycle_index > 0 and self.iter_index == self.params.clr.period_epochs*self.iterations_per_epoch):
             if self.cycle_index > 0:
-                self.best_model_buffer.save_model('{:03}'.format(self.cycle_index))
+                self.best_model_buffer.save_model(rel_dir = 'models', filename = 'clr.{:03}'.format(self.cycle_index))
                 self.best_model_buffer.restore()
                 self.best_model_buffer.reset()
                 self.min_lr *= self.params.clr.scale_min_lr

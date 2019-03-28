@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 
@@ -143,3 +144,11 @@ class MarginBaseLoss:
     def loss(self, net_output, y_class):
         self.loss_val = self.l2_loss(net_output, y_class) + self.mb_loss(net_output, y_class)
         return self.loss_val
+
+
+
+def save_model(model, params, rel_dir, filename):
+    file_name = os.path.join(params.get_base_filename(), rel_dir, filename)
+    dir_name = os.path.dirname(file_name)
+    os.makedirs(dir_name, exist_ok=True)
+    torch.save(model.state_dict(), file_name)
