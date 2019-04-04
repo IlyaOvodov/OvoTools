@@ -275,6 +275,7 @@ def create_supervised_trainer(model, optimizer, loss_fn, metrics={},
         model.to(device)
 
     def _update(engine, batch):
+        engine.state.output = None
         model.train()
         optimizer.zero_grad()
         x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
