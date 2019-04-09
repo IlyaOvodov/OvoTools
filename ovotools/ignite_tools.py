@@ -1,6 +1,7 @@
 import copy
 import math
 import os
+import subprocess
 import torch
 import ignite
 from ignite.engine import Events
@@ -172,9 +173,13 @@ class TensorBoardLogger:
         trainer_engine.add_event_handler(Events.COMPLETED, self.on_completed)
 
     def start_server(self, port):
-        cmd = r"tensorboard --host 127.0.0.1 --port {port} --logdir {dir}".format(port=port, dir=self.log_dir)
-        print(cmd)
-        os.popen(cmd)
+        #cmd = r"tensorboard --host 127.0.0.1 --port {port} --logdir {dir}".format(port=port, dir=self.log_dir)
+        #print(cmd)
+        #os.popen(cmd)
+        cmd = r'tensorboard --host 127.0.0.1 --port {port} --logdir ""'.format(port=port).split(' ')
+        cmd[-1] = self.log_dir # can contain spaces
+        print(' '.join(cmd))
+        subprocess.Popen(cmd)
 
     def on_completed(self, engine):
         self.writer.close()
