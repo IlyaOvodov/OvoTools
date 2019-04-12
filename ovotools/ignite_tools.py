@@ -125,7 +125,7 @@ class LogTrainingResults:
         self.best_model_buffer = best_model_buffer
         self.params = params
         if filename is None:
-            filename = self.params.get_model_name() + ".log"
+            filename = "log.log"
         self.file_name = os.path.join(self.params.get_base_filename(), rel_dir, filename)
 
         self.calls_count = collections.defaultdict(int)
