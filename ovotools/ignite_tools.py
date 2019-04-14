@@ -138,7 +138,7 @@ class LogTrainingResults:
             duty_cycles = self.duty_cycles
         elif isinstance(self.duty_cycles, dict):
             duty_cycles = self.duty_cycles[event]
-        if self.calls_count[event] % duty_cycles != 0:
+        if self.calls_count[event] % duty_cycles != 0 and self.calls_count[event] != 1: #always run 1st time to provide statistics
             return
         for key,loader in self.loaders_dict.items():
             self.evaluator.run(loader)
@@ -172,14 +172,15 @@ class TensorBoardLogger:
         self.call_count = 0
         trainer_engine.add_event_handler(Events.COMPLETED, self.on_completed)
 
-    def start_server(self, port):
+    def start_server(self, port, start_it = False):
         #cmd = r"tensorboard --host 127.0.0.1 --port {port} --logdir {dir}".format(port=port, dir=self.log_dir)
         #print(cmd)
         #os.popen(cmd)
         cmd = r'tensorboard --host 127.0.0.1 --port {port} --logdir ""'.format(port=port).split(' ')
         cmd[-1] = self.log_dir # can contain spaces
         print(' '.join(cmd))
-        subprocess.Popen(cmd)
+        if start_it:
+            subprocess.Popen(cmd)
 
     def on_completed(self, engine):
         self.writer.close()
