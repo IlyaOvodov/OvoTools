@@ -71,7 +71,7 @@ class AttrDict(dict):
         assert self.has('data_root')
         return os.path.join(self.data_root, self.get_model_name())
 
-    def save(self, base_fn = None, verbose = 1, can_overwrite = False):
+    def save(self, base_fn = None, verbose = 1, can_overwrite = False, create_dirs = False):
         '''
         save to file adding '.param.txt' to name
         '''
@@ -80,6 +80,9 @@ class AttrDict(dict):
         params_fn = base_fn + '.param.txt'
         if not can_overwrite:
             assert not os.path.exists(params_fn), "Can't save parameters to {}: File exists".format(params_fn)
+        if create_dirs:
+            dir_name = os.path.dirname(params_fn)
+            os.makedirs(dir_name, exist_ok=True)
         with open(params_fn, 'w+') as f:
             s = repr(self)
             s = s + '\nhash: ' + self.hash()
