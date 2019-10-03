@@ -176,8 +176,8 @@ class TensorBoardLogger:
         #cmd = r"tensorboard --host 127.0.0.1 --port {port} --logdir {dir}".format(port=port, dir=self.log_dir)
         #print(cmd)
         #os.popen(cmd)
-        cmd = r'tensorboard --host 127.0.0.1 --port {port} --logdir ""'.format(port=port).split(' ')
-        cmd[-1] = self.log_dir # can contain spaces
+        cmd = r'tensorboard --host 127.0.0.1 --logdir "" --port {port}'.format(port=port).split(' ')
+        cmd[-3] = os.path.abspath(self.log_dir) # log_dir can contain spaces, so need to be set after split
         print(' '.join(cmd))
         if start_it:
             subprocess.Popen(cmd)
