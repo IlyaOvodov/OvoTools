@@ -146,7 +146,6 @@ class LogTrainingResults:
                 engine.state.metrics[key+':'+k] = v
         if self.best_model_buffer:
             self.best_model_buffer(engine)
-            self.best_model_buffer.save_model(filename="last.t7")
         if event == Events.ITERATION_COMPLETED:
             str = "Epoch:{}.{}\t".format(engine.state.epoch, engine.state.iteration)
         else:
