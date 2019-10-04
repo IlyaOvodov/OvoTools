@@ -2,8 +2,10 @@ import hashlib
 import json
 import ast
 import os
+from collections import OrderedDict
 
-class AttrDict(dict):
+
+class AttrDict(OrderedDict):
     '''
     dictionary allowing to access by dic[xxx] as well as dic.xxx syntax, including nested dictionaries:
         m = param.AttrDict(a = 1, b = {'b1': 2, 'b2':3}, c = 4)
