@@ -1,5 +1,4 @@
-from .threading_dataloader import BatchThreadingDataLoader, ThreadingDataLoader
-from .cached_dataset import CachedDataSet
+from .data import CachedDataSet, BatchThreadingDataLoader, ThreadingDataLoader
 
 from .losses import MeanLoss
 
