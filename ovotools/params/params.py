@@ -186,40 +186,44 @@ if __name__=='__main__':
                 weight = 0.5,
              ),
         ],
-        optim='torch.optim.SGD',
-        optim_params=AttrDict(
-            lr=0.2,
-            momentum=0.9,
-            weight_decay=5e-4,  # 0.001,
-            # nesterov = False,
+        optimizer=AttrDict(
+            type='torch.optim.SGD',
+            params=AttrDict(
+                lr=0.2,
+                momentum=0.9,
+                weight_decay = 5e-4,  # 0.001,
+                # nesterov = False,
+            ),
         ),
-        lr_finder=AttrDict(
+        lr_finder = AttrDict(
             iters_num=200,
             log_lr_start=-4,
             log_lr_end=-0,
         ),
-        ls_cheduler='torch.optim.lr_scheduler.ReduceLROnPlateau',
-        clr=AttrDict(
-            warmup_epochs=1,
-            min_lr=0.0002,
-            max_lr=1e-1,
-            period_epochs=40,
-            scale_max_lr=0.95,
-            scale_min_lr=0.95,
-        ),
-        ReduceLROnPlateau_params=AttrDict(
-            mode='min',
-            factor=0.5,
-            patience=10,
-            min_lr=2.e-4,
-        ),
-        StepLR_params=AttrDict(
-            step_size=20,
-            gamma=0.5,
-        ),
-        MultiStepLR_params=AttrDict(
-            milestones=[25, 50, 75, 100, 125, 150, 175, 200, 215, 230, 245, 260, 275, 290, 300],
-            gamma=0.5,
+        lr_scheduler = AttrDict(
+            type = 'torch.optim.lr_scheduler.ReduceLROnPlateau',
+            clr=AttrDict(
+                warmup_epochs=1,
+                min_lr=0.0002,
+                max_lr=1e-1,
+                period_epochs=40,
+                scale_max_lr=0.95,
+                scale_min_lr=0.95,
+            ),
+            params=AttrDict( # ReduceLROnPlateau
+                mode='min',
+                factor=0.5,
+                patience=10,
+                min_lr=2.e-4,
+            ),
+            StepLR_params=AttrDict(
+                step_size=20,
+                gamma=0.5,
+            ),
+            MultiStepLR_params=AttrDict(
+                milestones=[25, 50, 75, 100, 125, 150, 175, 200, 215, 230, 245, 260, 275, 290, 300],
+                gamma=0.5,
+            ),
         ),
     )
     print(repr(m))

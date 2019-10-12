@@ -1,4 +1,4 @@
 from .params import AttrDict
-import .params
-import .pytorch
-import .ignite
+import params as params
+import pytorch as pytorch
+import ignite as ignite
