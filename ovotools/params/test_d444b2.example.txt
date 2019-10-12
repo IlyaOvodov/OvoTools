@@ -1,0 +1,74 @@
+{
+    'model_name': 'NN_results/segmentation/unet',
+    'data': {
+        'val_folds': ( 4, ),
+        'batch_size': 100,
+        'resize': ( 128, 800, ),
+        'crop': ( 128, 256, ),
+        'train_augmentations': {},
+        'crop_for_val': False,
+        'add_coordconv': False,
+    },
+    'model': {
+        'type': 'segmentation_models_pytorch.Unet',
+        'params': {
+            'encoder_name': 'resnet34',
+            'encoder_weights': 'imagenet',
+        },
+    },
+    'dann': {
+        'use_dann': False,
+        'lambda_max': 1.0,
+        'epochs': 40,
+        'weight': 0.1,
+    },
+    'loss': [
+        {
+            'type': 'torch.nn.BCEWithLogitsLoss',
+            'params': {},
+        },
+        {
+            'type': 'pytorch_toolbelt.losses.dice.DiceLoss',
+            'params': {
+                'mode': 'multilabel',
+                'log_loss': True,
+                'smooth': 1,
+            },
+            'weight': 0.5,
+        }, ],
+    'optim': 'torch.optim.SGD',
+    'optim_params': {
+        'lr': 0.2,
+        'momentum': 0.9,
+        'weight_decay': 0.0005,
+    },
+    'lr_finder': {
+        'iters_num': 200,
+        'log_lr_start': -4,
+        'log_lr_end': 0,
+    },
+    'ls_cheduler': 'torch.optim.lr_scheduler.ReduceLROnPlateau',
+    'clr': {
+        'warmup_epochs': 1,
+        'min_lr': 0.0002,
+        'max_lr': 0.1,
+        'period_epochs': 40,
+        'scale_max_lr': 0.95,
+        'scale_min_lr': 0.95,
+    },
+    'ReduceLROnPlateau_params': {
+        'mode': 'min',
+        'factor': 0.5,
+        'patience': 10,
+        'min_lr': 0.0002,
+    },
+    'StepLR_params': {
+        'step_size': 20,
+        'gamma': 0.5,
+    },
+    'MultiStepLR_params': {
+        'milestones': [ 25, 50, 75, 100, 125, 150, 175, 200, 215, 230, 245, 260, 275, 290, 300, ],
+        'gamma': 0.5,
+    },
+}
+hash: d444b2
