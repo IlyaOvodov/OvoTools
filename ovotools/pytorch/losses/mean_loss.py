@@ -9,7 +9,7 @@ class MeanLoss(torch.nn.modules.loss._Loss):
     def __init__(self, base_binary_locc):
         super(MeanLoss, self).__init__()
         self.base_loss = base_binary_locc
-		self.loss_vals = []
+        self.loss_vals = []
 
     def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
         assert y_true.shape == y_pred.shape, (y_pred.shape, y_true.shape)
@@ -19,16 +19,16 @@ class MeanLoss(torch.nn.modules.loss._Loss):
         return res
 
     def __len__(self):
-		'''
-		returns number of individual channel losses (not including the last value stored in self.loss_vals)
-		'''
+        '''
+        returns number of individual channel losses (not including the last value stored in self.loss_vals)
+        '''
         return len(self.loss_funcs)
 
     def get_val(self, index):
-		'''
+        '''
 		returns function that returns individual channel loss cor channel index
 		valid indexes are 0..self.len(). The last index=self.len() or index=1 is mean value returned by forward()
-		'''
+        '''
         def call(*kargs, **kwargs):
             return self.loss_vals[index]
         return call
