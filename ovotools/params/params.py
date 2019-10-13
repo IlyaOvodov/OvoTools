@@ -41,7 +41,7 @@ class AttrDict(OrderedDict):
             elif isinstance(v, list):
                 self[k] = [AttrDict(item) if isinstance(item, dict) else item for item in v]
 
-    def __repr__(self):
+    def __str__(self):
         def write_item(item, margin='\n'):
             if isinstance(item, dict):
                 s = '{'
@@ -62,7 +62,7 @@ class AttrDict(OrderedDict):
                     s += write_item(v, margin=margin + '    ')  + ","
                 s += ' ' + (']' if isinstance(item, list) else ')')
             else:
-                s = repr(item)
+                s = str(item)
             return s
         return write_item(self)
 
@@ -107,7 +107,7 @@ class AttrDict(OrderedDict):
             dir_name = os.path.dirname(params_fn)
             os.makedirs(dir_name, exist_ok=True)
         with open(params_fn, 'w+') as f:
-            s = repr(self)
+            s = str(self)
             s = s + '\nhash: ' + self.hash()
             f.write(s)
             if verbose >= 2:
@@ -135,7 +135,7 @@ class AttrDict(OrderedDict):
             assert s[-1].startswith('hash:')
             params = AttrDict.load_from_str(s[:-1], data_root)
         if verbose >= 2:
-            print('params: '+ repr(params) + '\nhash: ' + params.hash())
+            print('params: '+ str(params) + '\nhash: ' + params.hash())
         if verbose >= 1:
             print('loaded from ' + params_fn)
         return params
@@ -226,7 +226,7 @@ if __name__=='__main__':
             ),
         ),
     )
-    print(repr(m))
+    print(m)
 
     fn = 'test_' + m.hash()
     m.save(fn, can_overwrite=True)

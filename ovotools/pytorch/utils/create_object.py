@@ -1,7 +1,7 @@
 from typing import Callable
 import torch
 from ovotools import AttrDict
-from ..losses import MeanLoss, CompositeLoss
+from ..losses import SimpleLoss, CompositeLoss, MeanLoss
 
 
 def create_object(params: dict, eval_func: Callable = eval, *args, **kwargs) -> object:
@@ -23,7 +23,7 @@ def create_object(params: dict, eval_func: Callable = eval, *args, **kwargs) -> 
     all_kwargs = kwargs.copy()
     p = params.get('params', dict())
     all_kwargs.update(p)
-    print('creating: ', params['type'], p)
+    print('creating: ', params['type'], repr(dict(p)))
     obj = eval_func(params['type'])(*args, **all_kwargs)
     return obj
 
@@ -148,6 +148,7 @@ def CreateCompositeLoss(loss_params: dict, eval_func=eval) -> torch.nn.modules.l
         loss = create_object(loss_params, eval_func)
         if loss_params.get('mean', False):
             loss = MeanLoss(loss)
+        loss = SimpleLoss(loss, loss_params.get('key'))
         return loss
     else:
         loss_funcs = []
