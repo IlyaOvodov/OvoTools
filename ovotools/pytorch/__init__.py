@@ -1,6 +1,6 @@
 from .data import CachedDataSet, BatchThreadingDataLoader, ThreadingDataLoader
 
-from .losses import SimpleLoss, CompositeLoss, MeanLoss, LabelSmoothingBCEWithLogitsLoss
+from .losses import SimpleLoss, CompositeLoss, MeanLoss, LabelSmoothingBCEWithLogitsLoss, PseudoLabelingBCELoss
 
 from .modules import ReverseLayerF, DANN_module, Dann_Head, DannEncDecNet
 

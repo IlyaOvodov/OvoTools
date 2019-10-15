@@ -153,6 +153,6 @@ def CreateCompositeLoss(loss_params: dict, eval_func=eval) -> torch.nn.modules.l
     else:
         loss_funcs = []
         for loss_param in loss_params:
-            loss_i = CreateCompositeLoss(loss_param)
+            loss_i = CreateCompositeLoss(loss_param, eval_func=eval_func)
             loss_funcs.append((loss_i,  loss_param.get('weight', 1.),))
         return CompositeLoss(loss_funcs)

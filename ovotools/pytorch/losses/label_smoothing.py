@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-def LabelSmoothingBCEWithLogitsLoss(label_smoothing = 0, **kwargs):
+def LabelSmoothingBCEWithLogitsLoss(label_smoothing = 0.1, **kwargs):
     def loss(y, y_gt):
         '''
         s = 1/(1+exp(-x))
