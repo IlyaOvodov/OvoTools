@@ -41,7 +41,7 @@ class AttrDict(OrderedDict):
             elif isinstance(v, list):
                 self[k] = [AttrDict(item) if isinstance(item, dict) else item for item in v]
 
-    def __str__(self):
+    def __repr__(self):
         def write_item(item, margin='\n'):
             if isinstance(item, dict):
                 s = '{'
@@ -62,7 +62,7 @@ class AttrDict(OrderedDict):
                     s += write_item(v, margin=margin + '    ')  + ","
                 s += ' ' + (']' if isinstance(item, list) else ')')
             else:
-                s = str(item)
+                s = repr(item)
             return s
         return write_item(self)
 
@@ -236,6 +236,6 @@ if __name__=='__main__':
     mm.save(fn, can_overwrite=True)
     print(m)
     print(mm)
-    assert str(m)==str(mm)
+    assert repr(m)==repr(mm)
     os.remove(fn + '.param.txt')
     os.remove(fn + '0.param.txt')
