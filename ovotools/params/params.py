@@ -137,7 +137,7 @@ class AttrDict(OrderedDict):
         if verbose >= 2:
             print('params: '+ str(params) + '\nhash: ' + params.hash())
         if verbose >= 1:
-            print('loaded from ' + params_fn)
+            print('loaded from ' + str(params_fn))
         return params
 
         
