@@ -103,8 +103,10 @@ class AttrDict(OrderedDict):
         if not can_overwrite:
             assert not os.path.exists(file_name), "Can't save parameters to {}: File exists".format(params_fn)
         if create_dirs:
-            dir_name = os.path.dirname(file_name)
+            dir_name = os.path.dirname(os.path.dirname(file_name))
             os.makedirs(dir_name, exist_ok=True)
+        dir_name = os.path.dirname(file_name)
+        os.makedirs(dir_name, exist_ok=True)
         with open(file_name, 'w+') as f:
             s = str(self)
             s = s + '\nhash: ' + self.hash()
