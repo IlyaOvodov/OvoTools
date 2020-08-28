@@ -101,7 +101,7 @@ class AttrDict(OrderedDict):
         if file_name is None:
             file_name = os.path.join(self.get_base_filename(), 'param.txt')
         if not can_overwrite:
-            assert not os.path.exists(file_name), "Can't save parameters to {}: File exists".format(params_fn)
+            assert not os.path.exists(file_name), "Can't save parameters to {}: File exists".format(file_name)
         if create_dirs:
             dir_name = os.path.dirname(os.path.dirname(file_name))
             os.makedirs(dir_name, exist_ok=True)
