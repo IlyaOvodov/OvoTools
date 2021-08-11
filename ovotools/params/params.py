@@ -2,6 +2,7 @@ import hashlib
 import json
 import ast
 import os
+from typing import Dict, Any
 from collections import OrderedDict
 
 
@@ -140,6 +141,12 @@ class AttrDict(OrderedDict):
         if verbose >= 1:
             print('loaded from ' + str(params_fn))
         return params
+
+    def state_dict(self) -> Dict[str, Any]:
+        return {key: value for key, value in self.__dict__.items()}
+
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+        self.__dict__.update(state_dict)
 
         
 if __name__=='__main__':

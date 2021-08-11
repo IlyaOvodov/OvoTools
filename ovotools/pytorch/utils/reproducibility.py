@@ -4,6 +4,11 @@ import torch
 
 SEED = 241075
 
+# TODO
+#PYHTONHASHSEED
+#https://github.com/n01z3/kaggle-pneumothorax-segmentation/blob/master/n15_train.py#L32-L49
+#https://pytorch.org/docs/stable/generated/torch.set_deterministic.html#torch.set_deterministic
+
 def set_reproducibility(seed = SEED):
     '''
     attempts to make calculations reproducible

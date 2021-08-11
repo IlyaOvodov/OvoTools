@@ -8,6 +8,7 @@ from ignite.engine import Events
 import collections
 import time
 import tensorboardX
+from typing import Dict, Any
 
 
 
@@ -77,13 +78,21 @@ class BestModelBuffer:
         self.params = params
         self.reset()
 
+    def state_dict(self) -> Dict[str, Any]:
+        return {key: value for key, value in self.__dict__.items() if key not in {"model", "params"}}
+
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+        self.__dict__.update(state_dict)
+
     def reset(self):
         self.best_dict = None
         self.best_score = None
         self.best_epoch = None
 
     def __call__(self, engine):
-        assert self.metric_name in engine.state.metrics.keys(), "{} {}".format(self.metric_name, engine.state.metrics.keys())
+        if self.metric_name not in engine.state.metrics.keys():
+            print("Warning: metric {} not in {}".format(self.metric_name, engine.state.metrics.keys()))
+            return
         if self.best_score is None or self.best_score*self.minimize > engine.state.metrics[self.metric_name]*self.minimize:
             self.best_score = engine.state.metrics[self.metric_name]
             self.best_dict  = copy.deepcopy(self.model.state_dict())
@@ -224,6 +233,16 @@ class ClrScheduler:
                                                  save_to_file = False, verbose = 0)
         if engine:
             self.attach(engine)
+
+    def state_dict(self) -> Dict[str, Any]:
+        own_dict = {key: value for key, value in self.__dict__.items() if key not in {"optimizer", "params", "best_model_buffer"}}
+        own_dict["best_model_buffer"] = self.best_model_buffer.state_dict()
+        return own_dict
+
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+        self.best_model_buffer.load_state_dict(state_dict["best_model_buffer"])
+        del state_dict["best_model_buffer"]
+        self.__dict__.update(state_dict)
 
     def attach(self, engine):
         engine.add_event_handler(Events.EPOCH_STARTED, self.upd_lr_epoch)
