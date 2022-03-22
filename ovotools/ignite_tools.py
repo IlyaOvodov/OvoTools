@@ -8,6 +8,7 @@ from ignite.engine import Events
 import collections
 import time
 import tensorboardX
+from typing import Dict, Any
 
 
 
@@ -77,13 +78,21 @@ class BestModelBuffer:
         self.params = params
         self.reset()
 
+    def state_dict(self) -> Dict[str, Any]:
+        return {key: value for key, value in self.__dict__.items() if key not in {"model", "params"}}
+
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+        self.__dict__.update(state_dict)
+
     def reset(self):
         self.best_dict = None
         self.best_score = None
         self.best_epoch = None
 
     def __call__(self, engine):
-        assert self.metric_name in engine.state.metrics.keys(), "{} {}".format(self.metric_name, engine.state.metrics.keys())
+        if self.metric_name not in engine.state.metrics.keys():
+            print("Warning: metric {} not in {}".format(self.metric_name, engine.state.metrics.keys()))
+            return
         if self.best_score is None or self.best_score*self.minimize > engine.state.metrics[self.metric_name]*self.minimize:
             self.best_score = engine.state.metrics[self.metric_name]
             self.best_dict  = copy.deepcopy(self.model.state_dict())
@@ -169,15 +178,14 @@ class TensorBoardLogger:
         event = Events.ITERATION_COMPLETED if count_iters else Events.EPOCH_COMPLETED
         trainer_engine.add_event_handler(event, self.on_event)
         self.period = period
-        self.call_count = 0
         trainer_engine.add_event_handler(Events.COMPLETED, self.on_completed)
 
     def start_server(self, port, start_it = False):
         #cmd = r"tensorboard --host 127.0.0.1 --port {port} --logdir {dir}".format(port=port, dir=self.log_dir)
         #print(cmd)
         #os.popen(cmd)
-        cmd = r'tensorboard --host 127.0.0.1 --port {port} --logdir ""'.format(port=port).split(' ')
-        cmd[-1] = self.log_dir # can contain spaces
+        cmd = r'tensorboard --host 127.0.0.1 --logdir "" --port {port}'.format(port=port).split(' ')
+        cmd[-3] = os.path.abspath(self.log_dir) # log_dir can contain spaces, so need to be set after split
         print(' '.join(cmd))
         if start_it:
             subprocess.Popen(cmd)
@@ -191,8 +199,7 @@ class TensorBoardLogger:
         *|* are interpreted as series(train,val).plot_name(metric)
         *|*.* are interpreted as series(train,val).group(metric class).plot_name
         '''
-        self.call_count += 1
-        if self.call_count % self.period != 0:
+        if engine.state.iteration % self.period != 0:
             return
 
         metrics = collections.defaultdict(dict)
@@ -204,9 +211,9 @@ class TensorBoardLogger:
         for n, d in metrics.items():
             if len(d) == 1:
                 for k, v in d.items():
-                    self.writer.add_scalar(n, v, self.call_count)
+                    self.writer.add_scalar(n, v, engine.state.iteration)
             else:
-                self.writer.add_scalars(n, d, self.call_count)
+                self.writer.add_scalars(n, d, engine.state.iteration)
         for path, writer in self.writer.all_writers.items():
             writer.flush()
 
@@ -215,9 +222,9 @@ class ClrScheduler:
     def __init__(self, train_loader, model, optimizer, metric_name, params, minimize = True, engine = None):
         self.optimizer = optimizer
         self.params = params
-        self.cycle_index = 0
-        self.iter_index = 0
-        self.iterations_per_epoch = len(train_loader)
+        self.cycle_index = 0  # 0 - warmup, 1+ - cycle
+        self.inner_index = 0  # index starting from cycle begin
+        #self.iterations_per_epoch = len(train_loader)
         self.min_lr = params.clr.min_lr
         self.max_lr = params.clr.max_lr
         self.best_model_buffer = BestModelBuffer(model, metric_name, params, minimize = minimize,
@@ -225,14 +232,23 @@ class ClrScheduler:
         if engine:
             self.attach(engine)
 
+    def state_dict(self) -> Dict[str, Any]:
+        own_dict = {key: value for key, value in self.__dict__.items() if key not in {"optimizer", "params", "best_model_buffer"}}
+        own_dict["best_model_buffer"] = self.best_model_buffer.state_dict()
+        return own_dict
+
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+        self.best_model_buffer.load_state_dict(state_dict["best_model_buffer"])
+        del state_dict["best_model_buffer"]
+        self.__dict__.update(state_dict)
+
     def attach(self, engine):
-        engine.add_event_handler(Events.EPOCH_STARTED, self.upd_lr_epoch)
         engine.add_event_handler(Events.ITERATION_STARTED, self.upd_lr)
         engine.add_event_handler(Events.EPOCH_COMPLETED, self.best_model_buffer)
 
-    def upd_lr_epoch(self, engine):
-        if (self.cycle_index == 0 and self.iter_index == self.params.clr.warmup_epochs*self.iterations_per_epoch
-                                        or self.cycle_index > 0 and self.iter_index == self.params.clr.period_epochs*self.iterations_per_epoch):
+    def upd_lr(self, engine):
+        if (self.cycle_index == 0 and self.inner_index == self.params.clr.warmup_iters
+                                        or self.cycle_index > 0 and self.inner_index == self.params.clr.period_iters):
             if self.cycle_index > 0:
                 self.best_model_buffer.save_model(rel_dir = 'models', filename = 'clr.{:03}.t7'.format(self.cycle_index))
                 self.best_model_buffer.restore()
@@ -240,17 +256,15 @@ class ClrScheduler:
                 self.min_lr *= self.params.clr.get('scale_min_lr', 1)
                 self.max_lr *= self.params.clr.get('scale_max_lr', 1)
             self.cycle_index += 1
-            self.iter_index = 0
-
-    def upd_lr(self, engine):
+            self.inner_index = 0
         if self.cycle_index == 0:
-            lr = self.min_lr + (self.max_lr - self.min_lr) * self.iter_index/(self.params.clr.warmup_epochs*self.iterations_per_epoch)
+            lr = self.min_lr + (self.max_lr - self.min_lr) * self.inner_index / (self.params.clr.warmup_iters)
         else:
-            cycle_progress = self.iter_index / (self.params.clr.period_epochs*self.iterations_per_epoch)
+            cycle_progress = self.inner_index / (self.params.clr.period_iters)
             lr = self.max_lr + ((self.min_lr - self.max_lr) / 2) * (1 - math.cos(math.pi * cycle_progress))
         self.optimizer.param_groups[0]['lr'] = lr
         engine.state.metrics['lr'] = self.optimizer.param_groups[0]['lr']
-        self.iter_index += 1
+        self.inner_index += 1
 
 
 
