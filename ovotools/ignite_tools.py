@@ -213,7 +213,9 @@ class TensorBoardLogger:
                 for k, v in d.items():
                     self.writer.add_scalar(n, v, engine.state.iteration)
             else:
-                self.writer.add_scalars(n, d, engine.state.iteration)
+                # self.writer.add_scalars(n, d, engine.state.iteration)
+                for k, v in d.items():
+                    self.writer.add_scalar(n+'/'+k, v, engine.state.iteration)
         for path, writer in self.writer.all_writers.items():
             writer.flush()
 
