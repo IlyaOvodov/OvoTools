@@ -88,10 +88,12 @@ class BestModelBuffer:
         self.best_dict = None
         self.best_score = None
         self.best_epoch = None
+        self.err_msg = 'No error'
 
     def __call__(self, engine):
         if self.metric_name not in engine.state.metrics.keys():
-            print("Warning: metric {} not in {}".format(self.metric_name, engine.state.metrics.keys()))
+            self.err_msg = f"Warning: metric {self.metric_name} not in {engine.state.metrics.keys()}"
+            print(self.err_msg)
             return
         if self.best_score is None or self.best_score*self.minimize > engine.state.metrics[self.metric_name]*self.minimize:
             self.best_score = engine.state.metrics[self.metric_name]
@@ -111,12 +113,16 @@ class BestModelBuffer:
         torch.save(self.best_dict, file_name)
 
     def restore(self, model = None):
-        assert self.best_dict is not None
+        # if self.best_dict is None:
+        #     print("ERROR: BestModelBuffer can't restore: self.best_dict is None. Last error: " + self.err_msg)
+        #     return False
+        assert self.best_dict is not None, "BestModelBuffer can't restore: self.best_dict is None. Last error: " + self.err_msg
         if model is None:
             model = self.model
         if self.verbose:
             print('model for {}={} on epoch {} restored'.format(self.metric_name, self.best_score, self.best_epoch))
         model.load_state_dict(self.best_dict)
+        return True
 
 
 class LogTrainingResults:
